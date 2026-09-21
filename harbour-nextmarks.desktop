@@ -1,0 +1,22 @@
+[Desktop Entry]
+Type=Application
+X-Nemo-Application-Type=silica-qt5
+Icon=harbour-nextmarks
+Exec=harbour-nextmarks
+Name=Nextmarks
+Name[de]=Nextmarks
+# A share always lands in the already-running instance rather than
+# spawning a second one.
+X-Nemo-Single-Instance=yes
+X-Share-Methods=link
+
+[X-Share Method link]
+Description=Save to Nextcloud Bookmarks
+Description[de]=In Nextcloud-Lesezeichen speichern
+Capabilities=text/x-url;text/uri-list;text/plain
+SupportsMultipleFiles=no
+
+[X-Sailjail]
+OrganizationName=harbour-nextmarks
+ApplicationName=harbour-nextmarks
+Permissions=Internet

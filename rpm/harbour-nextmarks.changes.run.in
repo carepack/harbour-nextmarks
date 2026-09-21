@@ -1,0 +1,4 @@
+#!/bin/bash
+# Rename this file to harbour-nextmarks.changes.run to auto-generate
+# the changelog from git commit messages.
+sfdk-changelog
