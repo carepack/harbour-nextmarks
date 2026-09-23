@@ -1,0 +1,14 @@
+# Add newest entries at the top.
+
+* Wed Sep 23 2026 em_prv <em_prv@gmx.de> 1.0.0-2
+- Share a link from any app via "Save to Nextcloud Bookmarks"
+- Log in via Nextcloud's browser-based Login Flow v2 (2FA-compatible)
+- Home screen shows the account's folder tree; create/delete folders
+- Add or delete bookmarks; preview images/favicons shown when available
+- German translation
+
+* Fri Sep 18 2026 em_prv <em_prv@gmx.de> 1.0.0-1
+- First official release
+
+* Thu Sep 17 2026 em_prv <em_prv@gmx.de> 0.1.0-1
+- Initial release

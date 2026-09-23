@@ -1,8 +1,0 @@
-# Rename this file to harbour-nextmarks.changes to include it in the RPM.
-# Add newest entries at the top.
-
-* Fri Sep 18 2026 harbour-nextmarks contributors <noreply@example.com> 1.0.0-1
-- First official release
-
-* Thu Sep 17 2026 harbour-nextmarks contributors <noreply@example.com> 0.1.0-1
-- Initial release
