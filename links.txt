@@ -1,0 +1,3 @@
+https://github.com/floccusaddon/floccus
+https://github.com/nextcloud/bookmarks
+https://github.com/nextcloud/server
