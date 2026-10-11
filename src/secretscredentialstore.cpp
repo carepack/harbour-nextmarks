@@ -14,8 +14,8 @@ namespace {
 
 // StandaloneDeviceLockSecret has no usable default plugin -- leaving these
 // unset fails every request with SecretManagerNotInitializedError despite
-// SecretManager::isInitialized() being true. Confirmed against the daemon's
-// own `secrets-tool --list-plugins` during harbour-readeck's U1.
+// SecretManager::isInitialized() being true. Confirmed empirically via
+// `secrets-tool --list-plugins` against the real daemon.
 const QString kStoragePlugin = QStringLiteral("org.sailfishos.secrets.plugin.storage.sqlite");
 const QString kEncryptionPlugin = QStringLiteral("org.sailfishos.secrets.plugin.encryption.openssl");
 

@@ -19,12 +19,13 @@ namespace {
 const int kPollIntervalMs = 2000;
 const int kMaxPollAttempts = 560; // ~18.5 minutes at 2s
 const char *kBookmarksApiBase = "/index.php/apps/bookmarks/public/rest/v2";
+const char *kSecretName = "harbour-nextmarks/session";
 }
 
 NextcloudClient::NextcloudClient(QObject *parent)
     : QObject(parent)
     , m_manager(new QNetworkAccessManager(this))
-    , m_secretsStore(QStringLiteral("harbour-nextmarks/session"))
+    , m_secretsStore(QLatin1String(kSecretName))
 {
     m_pollTimer.setInterval(kPollIntervalMs);
     connect(&m_pollTimer, &QTimer::timeout, this, &NextcloudClient::pollNow);
@@ -71,8 +72,6 @@ void NextcloudClient::restoreSession()
     QSettings settings;
     m_serverUrl = settings.value(QStringLiteral("serverUrl")).toString();
     const bool pendingSecretDelete = settings.value(QStringLiteral("pendingSecretDelete"), false).toBool();
-    const QString plaintextLoginName = settings.value(QStringLiteral("loginName")).toString();
-    const QString plaintextAppPassword = settings.value(QStringLiteral("appPassword")).toString();
 
     if (pendingSecretDelete) {
         // A prior logout's Secrets delete failed; retry it now. Either way
@@ -86,6 +85,8 @@ void NextcloudClient::restoreSession()
         return;
     }
 
+    const QString plaintextLoginName = settings.value(QStringLiteral("loginName")).toString();
+    const QString plaintextAppPassword = settings.value(QStringLiteral("appPassword")).toString();
     if (!plaintextLoginName.isEmpty() || !plaintextAppPassword.isEmpty()) {
         // Leftover from a version before this change shipped: migrate it
         // into Secrets once, then forget it ever lived in QSettings (R4).
