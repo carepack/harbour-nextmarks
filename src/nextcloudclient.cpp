@@ -374,6 +374,41 @@ void NextcloudClient::saveBookmark(const QString &url, const QString &title, int
     });
 }
 
+void NextcloudClient::updateBookmark(int bookmarkId, const QString &url, const QString &title, int folderId)
+{
+    setBusy(true);
+    setLastError(QString());
+
+    // Unlike saveBookmark()'s create path, title is always sent here, even
+    // empty: omitting it would only be safe if PUT left an absent field
+    // unchanged, which isn't confirmed, and if PUT instead replaces the
+    // whole resource, omitting it could silently clear a title the user
+    // never asked to clear, or ignore one they deliberately emptied.
+    // Always sending the field is correct either way.
+    QJsonObject body;
+    body[QStringLiteral("url")] = url;
+    body[QStringLiteral("title")] = title;
+    QJsonArray folders;
+    folders.append(folderId);
+    body[QStringLiteral("folders")] = folders;
+
+    QNetworkReply *reply = m_manager->put(
+        buildRequest(QLatin1String(kBookmarksApiBase) + QStringLiteral("/bookmark/") + QString::number(bookmarkId)),
+        QJsonDocument(body).toJson(QJsonDocument::Compact));
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        const QByteArray raw = reply->readAll();
+        setBusy(false);
+        if (reply->error() == QNetworkReply::NoError) {
+            emit bookmarkUpdated();
+        } else {
+            const QString message = extractErrorMessage(reply, raw);
+            setLastError(message);
+            emit bookmarkUpdateFailed(message);
+        }
+        reply->deleteLater();
+    });
+}
+
 void NextcloudClient::createFolder(const QString &title, int parentFolderId)
 {
     setBusy(true);

@@ -5,12 +5,20 @@ Dialog {
     id: dialog
 
     // Pre-filled when opened from the share sheet (see harbour-nextmarks.qml
-    // shareInto()); empty when opened from the pulley menu.
+    // shareInto()) or to edit an existing bookmark (see FolderBookmarksPage.qml);
+    // empty when opened from the pulley menu to create a new one.
     property string initialUrl: ""
     property string initialTitle: ""
 
     property int selectedFolderId: -1
     property string selectedFolderTitle: qsTr("(No folder)")
+
+    // A separate sentinel from selectedFolderId's -1 above (that one means
+    // the real root folder, a valid target) -- here -1 means no bookmark
+    // is being edited at all, i.e. this dialog is creating a new one. Any
+    // other value means it's editing that existing bookmark in place.
+    property int editBookmarkId: -1
+    readonly property bool isEditing: editBookmarkId !== -1
 
     // Not gated on urlField.text here (see NewFolderDialog.qml's comment
     // on canAccept): Sailfish's virtual keyboard buffers the word being
@@ -26,7 +34,11 @@ Dialog {
         Qt.inputMethod.commit()
         var url = urlField.text.trim()
         if (url.length > 0) {
-            nextcloudClient.saveBookmark(url, titleField.text.trim(), selectedFolderId)
+            if (isEditing) {
+                nextcloudClient.updateBookmark(editBookmarkId, url, titleField.text.trim(), selectedFolderId)
+            } else {
+                nextcloudClient.saveBookmark(url, titleField.text.trim(), selectedFolderId)
+            }
         }
     }
 
@@ -40,7 +52,7 @@ Dialog {
             spacing: Theme.paddingMedium
 
             DialogHeader {
-                title: qsTr("Save bookmark")
+                title: isEditing ? qsTr("Edit bookmark") : qsTr("Save bookmark")
                 acceptText: qsTr("Save")
             }
 
