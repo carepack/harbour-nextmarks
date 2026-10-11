@@ -8,13 +8,18 @@
 #include <QTimer>
 #include <QUrlQuery>
 
+#include "secretscredentialstore.h"
+
 // Talks to a Nextcloud server: authenticates via Nextcloud's "Login Flow v2"
 // (the same browser-based flow the official Nextcloud apps use -- see
 // https://docs.nextcloud.com/server/latest/developer_manual/client_apis/LoginFlow/index.html),
 // then uses the resulting app password to call the Nextcloud Bookmarks
 // app's REST API (https://nextcloud-bookmarks.readthedocs.io/) to list
 // folders and create bookmarks. There is no local bookmark store and no
-// sync logic -- every save is a single POST to the server.
+// sync logic -- every save is a single POST to the server. serverUrl
+// persists in the app's private QSettings storage; loginName and
+// appPassword persist via Sailfish Secrets instead (SecretsCredentialStore)
+// -- never as plaintext.
 class NextcloudClient : public QObject
 {
     Q_OBJECT
@@ -125,13 +130,16 @@ private:
     void setLastError(const QString &error);
     void setLoginInProgress(bool inProgress);
     void restoreSession();
-    void persistSession();
+    void persistServerUrl();
+    void persistCredential();
+    static QVariantMap credentialFields(const QString &loginName, const QString &appPassword);
     QString normalizeServerUrl(const QString &input) const;
     QNetworkRequest buildRequest(const QString &path, const QUrlQuery &query = QUrlQuery()) const;
     QString extractErrorMessage(QNetworkReply *reply, const QByteArray &body) const;
     void flattenFolders(const QVariantList &nodes, int depth, QVariantList &out) const;
 
     QNetworkAccessManager *m_manager;
+    SecretsCredentialStore m_secretsStore;
     QTimer m_pollTimer;
 
     QString m_serverUrl;
