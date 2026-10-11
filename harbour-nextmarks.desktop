@@ -19,4 +19,4 @@ SupportsMultipleFiles=no
 [X-Sailjail]
 OrganizationName=harbour-nextmarks
 ApplicationName=harbour-nextmarks
-Permissions=Internet
+Permissions=Internet;Secrets
