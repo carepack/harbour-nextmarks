@@ -20,13 +20,26 @@ namespace Sailfish { namespace Secrets { class SecretManager; } }
 class SecretsCredentialStore
 {
 public:
-    enum class Outcome { Succeeded, NotFound, Failed };
+    // Locked is distinct from Failed: it means the daemon reported the
+    // collection itself needs device-lock authentication we can't provide
+    // with PreventInteraction. Confirmed on a real device (same issue hit
+    // in harbour-readeck): this does not reliably clear on its own within
+    // any bounded window post-boot, so the caller (NextcloudClient::
+    // restoreSession()) reacts to it by retrying once with
+    // allowInteraction=true, surfacing the platform's own unlock prompt
+    // instead of waiting silently. Every other daemon-side error stays
+    // Failed.
+    enum class Outcome { Succeeded, NotFound, Locked, Failed };
 
     explicit SecretsCredentialStore(const QString &secretName);
     ~SecretsCredentialStore();
 
     Outcome store(const QVariantMap &fields);
-    Outcome load(QVariantMap *outFields);
+
+    // allowInteraction lets the daemon show its own system unlock prompt
+    // (SystemInteraction) instead of failing silently (PreventInteraction)
+    // when the collection is still locked post-boot.
+    Outcome load(QVariantMap *outFields, bool allowInteraction = false);
     Outcome remove();
 
 private:

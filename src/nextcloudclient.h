@@ -130,6 +130,7 @@ private:
     void setLastError(const QString &error);
     void setLoginInProgress(bool inProgress);
     void restoreSession();
+    void unlockSecretsInteractively();
     void persistServerUrl();
     void persistCredential();
     static QVariantMap credentialFields(const QString &loginName, const QString &appPassword);

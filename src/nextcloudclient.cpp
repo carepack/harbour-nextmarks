@@ -2,7 +2,6 @@
 
 #include <QSettings>
 #include <QDebug>
-#include <QThread>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
@@ -107,23 +106,34 @@ void NextcloudClient::restoreSession()
 
     QVariantMap credential;
     auto loadOutcome = m_secretsStore.load(&credential);
-    if (loadOutcome == SecretsCredentialStore::Outcome::Failed) {
-        // Suspected race on a real device (same fix applied to
-        // harbour-readeck, not yet device-confirmed there either): right
-        // after the user enters their device-lock code post-reboot, the
-        // Secrets daemon may not yet have propagated that unlock to a
-        // StandaloneDeviceLockSecret's encryption key by the time this
-        // constructor runs. A genuine, permanent failure (corrupted
-        // secret, daemon truly down) fails the retry too and falls
-        // through exactly as before. NotFound is not retried -- that's a
-        // legitimate "no secret stored" state, not a race.
-        QThread::msleep(500);
-        loadOutcome = m_secretsStore.load(&credential);
-    }
     if (loadOutcome == SecretsCredentialStore::Outcome::Succeeded) {
         m_loginName = credential.value(QStringLiteral("loginName")).toString();
         m_appPassword = credential.value(QStringLiteral("appPassword")).toString();
+    } else if (loadOutcome == SecretsCredentialStore::Outcome::Locked) {
+        // Confirmed on a real device (harbour-readeck hit this first): a
+        // post-boot CollectionIsLockedError does not reliably clear on its
+        // own within any bounded window -- silently waiting for it to
+        // resolve isn't viable. Deferred via singleShot so this fires
+        // after the QML window is shown (this runs from the constructor,
+        // before main() calls view->show()): the platform's own unlock
+        // prompt then appears as an overlay on top of the visible login
+        // screen, the same way other Secrets-using apps prompt once per
+        // boot.
+        QTimer::singleShot(0, this, &NextcloudClient::unlockSecretsInteractively);
     }
+}
+
+void NextcloudClient::unlockSecretsInteractively()
+{
+    QVariantMap credential;
+    const auto outcome = m_secretsStore.load(&credential, /*allowInteraction=*/true);
+    if (outcome == SecretsCredentialStore::Outcome::Succeeded) {
+        m_loginName = credential.value(QStringLiteral("loginName")).toString();
+        m_appPassword = credential.value(QStringLiteral("appPassword")).toString();
+        emit isLoggedInChanged();
+    }
+    // Otherwise (user dismissed the prompt, or a genuine failure): stay on
+    // the login screen -- the user can still log in manually.
 }
 
 void NextcloudClient::persistServerUrl()

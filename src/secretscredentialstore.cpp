@@ -32,6 +32,19 @@ bool isNotFoundError(Sailfish::Secrets::Result::ErrorCode code)
             || code == Sailfish::Secrets::Result::InvalidSecretIdentifierError;
 }
 
+// Confirmed on a real device (harbour-readeck hit the same issue first):
+// right after boot, even after the user enters their device-lock code, a
+// load() against a StandaloneDeviceLockSecret fails with
+// CollectionIsLockedError -- PreventInteraction can never satisfy whatever
+// the daemon needs here, so this is not a brief race a short retry can
+// paper over. CollectionIsBusyError is grouped with it as the same "try
+// again later, this isn't a real failure" class.
+bool isLockedError(Sailfish::Secrets::Result::ErrorCode code)
+{
+    return code == Sailfish::Secrets::Result::CollectionIsLockedError
+            || code == Sailfish::Secrets::Result::CollectionIsBusyError;
+}
+
 }
 
 SecretsCredentialStore::SecretsCredentialStore(const QString &secretName)
@@ -81,12 +94,14 @@ SecretsCredentialStore::Outcome SecretsCredentialStore::store(const QVariantMap 
     return Outcome::Failed;
 }
 
-SecretsCredentialStore::Outcome SecretsCredentialStore::load(QVariantMap *outFields)
+SecretsCredentialStore::Outcome SecretsCredentialStore::load(QVariantMap *outFields, bool allowInteraction)
 {
     Sailfish::Secrets::StoredSecretRequest req;
     req.setManager(m_manager.data());
     req.setIdentifier(identifierFor(m_secretName));
-    req.setUserInteractionMode(Sailfish::Secrets::SecretManager::PreventInteraction);
+    req.setUserInteractionMode(allowInteraction
+            ? Sailfish::Secrets::SecretManager::SystemInteraction
+            : Sailfish::Secrets::SecretManager::PreventInteraction);
     req.startRequest();
     req.waitForFinished();
 
@@ -104,7 +119,10 @@ SecretsCredentialStore::Outcome SecretsCredentialStore::load(QVariantMap *outFie
         return Outcome::Succeeded;
     }
 
-    return isNotFoundError(req.result().errorCode()) ? Outcome::NotFound : Outcome::Failed;
+    if (isNotFoundError(req.result().errorCode())) {
+        return Outcome::NotFound;
+    }
+    return isLockedError(req.result().errorCode()) ? Outcome::Locked : Outcome::Failed;
 }
 
 SecretsCredentialStore::Outcome SecretsCredentialStore::remove()
