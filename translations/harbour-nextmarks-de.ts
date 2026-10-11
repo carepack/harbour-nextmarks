@@ -15,6 +15,14 @@
         <translation>Aktualisieren</translation>
     </message>
     <message>
+        <source>Edit</source>
+        <translation>Bearbeiten</translation>
+    </message>
+    <message>
+        <source>Delete</source>
+        <translation>Löschen</translation>
+    </message>
+    <message>
         <source>No bookmarks in this folder</source>
         <translation>Keine Lesezeichen in diesem Ordner</translation>
     </message>
@@ -144,6 +152,10 @@
     <message>
         <source>Save bookmark</source>
         <translation>Lesezeichen speichern</translation>
+    </message>
+    <message>
+        <source>Edit bookmark</source>
+        <translation>Lesezeichen bearbeiten</translation>
     </message>
     <message>
         <source>Save</source>
