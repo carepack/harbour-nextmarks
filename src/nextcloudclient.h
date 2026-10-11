@@ -71,6 +71,13 @@ public:
     Q_INVOKABLE void createFolder(const QString &title, int parentFolderId);
     Q_INVOKABLE void deleteFolder(int folderId);
 
+    // Changes only the folder's title -- not a move/reparent. The Bookmarks
+    // API's folder PUT reuses the create body shape (title + parent_folder);
+    // parentFolderId is the folder's own current parent (threaded through
+    // from the flattened folder list's parentId field) and must always be
+    // resent unchanged, since omitting it reparents the folder to root.
+    Q_INVOKABLE void renameFolder(int folderId, const QString &title, int parentFolderId);
+
     // Lists the bookmarks directly inside one folder (not recursive --
     // matches how the Nextcloud Bookmarks web UI itself scopes a folder
     // view). folderId -1 is the reserved root folder id, valid the same
@@ -117,6 +124,8 @@ signals:
     void folderCreateFailed(const QString &message);
     void folderDeleted();
     void folderDeleteFailed(const QString &message);
+    void folderRenamed();
+    void folderRenameFailed(const QString &message);
     void bookmarkDeleted();
     void bookmarkDeleteFailed(const QString &message);
 
@@ -129,7 +138,7 @@ private:
     QString normalizeServerUrl(const QString &input) const;
     QNetworkRequest buildRequest(const QString &path, const QUrlQuery &query = QUrlQuery()) const;
     QString extractErrorMessage(QNetworkReply *reply, const QByteArray &body) const;
-    void flattenFolders(const QVariantList &nodes, int depth, QVariantList &out) const;
+    void flattenFolders(const QVariantList &nodes, int depth, int parentId, QVariantList &out) const;
 
     QNetworkAccessManager *m_manager;
     QTimer m_pollTimer;
