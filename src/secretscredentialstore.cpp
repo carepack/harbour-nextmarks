@@ -2,6 +2,8 @@
 
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QJsonParseError>
+#include <QDebug>
 
 #include <Secrets/secretmanager.h>
 #include <Secrets/secret.h>
@@ -66,8 +68,17 @@ SecretsCredentialStore::Outcome SecretsCredentialStore::store(const QVariantMap 
     req.startRequest();
     req.waitForFinished();
 
-    return req.result().code() == Sailfish::Secrets::Result::Succeeded
-            ? Outcome::Succeeded : Outcome::Failed;
+    if (req.result().code() == Sailfish::Secrets::Result::Succeeded) {
+        return Outcome::Succeeded;
+    }
+    // removeInternal() above already succeeded (or found nothing to
+    // delete), so this specific failure means the prior secret, if any,
+    // is now gone and nothing replaced it -- distinct from the ordinary
+    // "daemon unreachable for the whole call" case, where nothing changed.
+    qWarning() << "SecretsCredentialStore: delete-before-store succeeded but "
+                  "the store itself failed; any previous secret at this "
+                  "identifier is now gone";
+    return Outcome::Failed;
 }
 
 SecretsCredentialStore::Outcome SecretsCredentialStore::load(QVariantMap *outFields)
@@ -80,8 +91,15 @@ SecretsCredentialStore::Outcome SecretsCredentialStore::load(QVariantMap *outFie
     req.waitForFinished();
 
     if (req.result().code() == Sailfish::Secrets::Result::Succeeded) {
+        QJsonParseError parseError;
+        const QJsonDocument doc = QJsonDocument::fromJson(req.secret().data(), &parseError);
+        if (parseError.error != QJsonParseError::NoError || !doc.isObject()) {
+            qWarning() << "SecretsCredentialStore: stored secret data is not the expected "
+                          "JSON object; treating as a failed load rather than an empty one";
+            return Outcome::Failed;
+        }
         if (outFields) {
-            *outFields = QJsonDocument::fromJson(req.secret().data()).object().toVariantMap();
+            *outFields = doc.object().toVariantMap();
         }
         return Outcome::Succeeded;
     }

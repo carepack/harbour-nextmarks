@@ -2,6 +2,7 @@
 
 #include <QSettings>
 #include <QDebug>
+#include <QThread>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
@@ -105,7 +106,21 @@ void NextcloudClient::restoreSession()
     }
 
     QVariantMap credential;
-    if (m_secretsStore.load(&credential) == SecretsCredentialStore::Outcome::Succeeded) {
+    auto loadOutcome = m_secretsStore.load(&credential);
+    if (loadOutcome == SecretsCredentialStore::Outcome::Failed) {
+        // Suspected race on a real device (same fix applied to
+        // harbour-readeck, not yet device-confirmed there either): right
+        // after the user enters their device-lock code post-reboot, the
+        // Secrets daemon may not yet have propagated that unlock to a
+        // StandaloneDeviceLockSecret's encryption key by the time this
+        // constructor runs. A genuine, permanent failure (corrupted
+        // secret, daemon truly down) fails the retry too and falls
+        // through exactly as before. NotFound is not retried -- that's a
+        // legitimate "no secret stored" state, not a race.
+        QThread::msleep(500);
+        loadOutcome = m_secretsStore.load(&credential);
+    }
+    if (loadOutcome == SecretsCredentialStore::Outcome::Succeeded) {
         m_loginName = credential.value(QStringLiteral("loginName")).toString();
         m_appPassword = credential.value(QStringLiteral("appPassword")).toString();
     }
@@ -133,8 +148,13 @@ void NextcloudClient::persistCredential()
         // authenticated, not the stale one a pending retry would delete.
         // Without this, restoreSession()'s pendingSecretDelete branch would
         // delete this brand-new session on the next launch and log it out.
+        // Flushed explicitly -- the same crash-safety reasoning as the
+        // flag's set side in logout() -- so a kill between the daemon-side
+        // store() succeeding and this write reaching disk can't leave the
+        // stale flag behind to delete the session it was just cleared for.
         QSettings settings;
         settings.remove(QStringLiteral("pendingSecretDelete"));
+        settings.sync();
     } else {
         // R5: the session still works for this run, held only in memory;
         // nothing is written back to plaintext QSettings as a fallback.
@@ -251,13 +271,22 @@ void NextcloudClient::cancelLogin()
 
 void NextcloudClient::logout()
 {
-    // Written before the blocking delete call below so a process killed
-    // mid-call still leaves a retry flag behind, rather than losing both
-    // the delete and the only record that one was needed (R6). Flushed
-    // explicitly since QSettings::setValue() alone does not guarantee the
-    // write reaches disk before a kill at exactly the wrong moment.
+    // Everything written to QSettings for this logout -- the pending-delete
+    // flag (R6) and clearing any plaintext leftover from an interrupted
+    // migration (R7) -- happens here, together, and is flushed before the
+    // blocking delete call below. A process killed mid-call then leaves a
+    // retry flag with no plaintext leftover still present; writing the
+    // plaintext-clear only after that blocking call returned would let a
+    // kill during it leave "pending flag + plaintext still present" on
+    // disk, which restoreSession()'s pending-delete branch never checks --
+    // the plaintext would survive untouched until a later successful retry
+    // clears the flag, and the launch after that would silently resurrect
+    // it via the migration path (the same bug R7 fixes, reopened by
+    // ordering rather than missing logic).
     QSettings settings;
     settings.setValue(QStringLiteral("pendingSecretDelete"), true);
+    settings.remove(QStringLiteral("loginName"));
+    settings.remove(QStringLiteral("appPassword"));
     settings.sync();
 
     if (m_secretsStore.remove() == SecretsCredentialStore::Outcome::Succeeded) {
@@ -271,13 +300,6 @@ void NextcloudClient::logout()
         qWarning() << "NextcloudClient: failed to delete credential from Secrets; "
                       "will retry on next launch";
     }
-
-    // A plaintext leftover from an interrupted migration must not survive
-    // an explicit logout either -- otherwise restoreSession() keeps
-    // retrying that migration on every later launch and silently logs the
-    // user back into the exact session they just ended (R7).
-    settings.remove(QStringLiteral("loginName"));
-    settings.remove(QStringLiteral("appPassword"));
 
     m_serverUrl.clear();
     m_loginName.clear();
