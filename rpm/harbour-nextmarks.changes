@@ -1,5 +1,8 @@
 # Add newest entries at the top.
 
+* Sun Oct 11 2026 Contributor <contributor@example.com> 1.0.1-1
+- Your login is now kept in Sailfish's own secure storage instead of a plain settings file; existing logins switch over automatically.
+
 * Wed Sep 23 2026 Contributor <contributor@example.com> 1.0.0-2
 - Share a link from any app via "Save to Nextcloud Bookmarks"
 - Log in via Nextcloud's browser-based Login Flow v2 (2FA-compatible)
