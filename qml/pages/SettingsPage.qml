@@ -37,6 +37,8 @@ Page {
                 }
             }
 
+            Item { width: parent.width; height: Theme.paddingMedium }
+
             Column {
                 x: Theme.horizontalPageMargin
                 width: parent.width - 2 * Theme.horizontalPageMargin
