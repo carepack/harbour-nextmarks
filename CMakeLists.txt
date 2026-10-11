@@ -5,6 +5,7 @@ find_package(Qt5 COMPONENTS Core Network Qml Gui Quick DBus REQUIRED)
 
 include(FindPkgConfig)
 pkg_search_module(SAILFISH sailfishapp REQUIRED)
+pkg_search_module(SAILFISHSECRETS sailfishsecrets REQUIRED)
 
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
@@ -15,6 +16,7 @@ add_executable(harbour-nextmarks
     src/nextcloudclient.cpp
     src/sharereceiver.cpp
     src/bookmarkimageprovider.cpp
+    src/secretscredentialstore.cpp
 )
 
 target_compile_definitions(harbour-nextmarks PRIVATE
@@ -22,12 +24,14 @@ target_compile_definitions(harbour-nextmarks PRIVATE
 )
 target_include_directories(harbour-nextmarks PRIVATE
     "$<BUILD_INTERFACE:${SAILFISH_INCLUDE_DIRS}>"
+    "$<BUILD_INTERFACE:${SAILFISHSECRETS_INCLUDE_DIRS}>"
 )
 target_link_libraries(harbour-nextmarks
     Qt5::Quick
     Qt5::Network
     Qt5::DBus
     ${SAILFISH_LDFLAGS}
+    ${SAILFISHSECRETS_LDFLAGS}
 )
 
 install(TARGETS harbour-nextmarks RUNTIME DESTINATION bin)
