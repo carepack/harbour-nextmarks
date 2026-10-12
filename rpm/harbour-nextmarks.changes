@@ -1,5 +1,11 @@
 # Add newest entries at the top.
 
+* Mon Oct 12 2026 Contributor <contributor@example.com> 1.0.2-1
+- Rename folders from their context menu
+- Edit a bookmark's URL, title, and folder after saving it
+- Settings page: server/username shown left-aligned with spacing between
+  the two, matching harbour-readeck
+
 * Sun Oct 11 2026 Contributor <contributor@example.com> 1.0.1-1
 - Your login is now kept in Sailfish's own secure storage instead of a plain settings file; existing logins switch over automatically.
 
