@@ -31,6 +31,11 @@ Page {
             banner.text = message
             banner.visible = true
         }
+        onBookmarkUpdated: nextcloudClient.loadBookmarksInFolder(folderId)
+        onBookmarkUpdateFailed: {
+            banner.text = message
+            banner.visible = true
+        }
     }
 
     SilicaListView {
@@ -57,6 +62,24 @@ Page {
             // Silica remorse mechanism tried there let its countdown run
             // and visibly complete without ever invoking the callback.
             menu: ContextMenu {
+                MenuItem {
+                    text: qsTr("Edit")
+                    onClicked: pageStack.push(Qt.resolvedUrl("SaveBookmarkPage.qml"), {
+                        editBookmarkId: modelData.id,
+                        initialUrl: modelData.url,
+                        // modelData.title already falls back to the URL
+                        // when the bookmark has no real title (see
+                        // loadBookmarksInFolder()) -- the same check the
+                        // secondary label below uses to detect that case.
+                        // Passing that fallback straight into the edit
+                        // field would, on save, write the URL back as a
+                        // literal stored title instead of leaving it
+                        // titleless.
+                        initialTitle: modelData.title === modelData.url ? "" : modelData.title,
+                        selectedFolderId: folderId,
+                        selectedFolderTitle: folderTitle
+                    })
+                }
                 MenuItem {
                     text: qsTr("Delete")
                     onClicked: nextcloudClient.deleteBookmark(modelData.id)

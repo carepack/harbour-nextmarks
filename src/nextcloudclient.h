@@ -68,6 +68,12 @@ public:
     Q_INVOKABLE void loadFolders();
     Q_INVOKABLE void saveBookmark(const QString &url, const QString &title, int folderId);
 
+    // Edits an existing bookmark's url/title/folder in place. The
+    // Bookmarks API's bookmark PUT takes the same body shape as creation
+    // (url + title + folders array); folderId lets the same request also
+    // move the bookmark to a different folder.
+    Q_INVOKABLE void updateBookmark(int bookmarkId, const QString &url, const QString &title, int folderId);
+
     // parentFolderId -1 creates a top-level folder, same reserved root
     // id used everywhere else in this class. Both reload the folder list
     // on success (so the tree QML is bound to is immediately correct)
@@ -123,6 +129,8 @@ signals:
     void loginFailed(const QString &message);
     void bookmarkSaved();
     void bookmarkSaveFailed(const QString &message);
+    void bookmarkUpdated();
+    void bookmarkUpdateFailed(const QString &message);
     void foldersFailed(const QString &message);
     void bookmarksFailed(const QString &message);
     void folderCreated();
