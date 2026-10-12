@@ -1,6 +1,7 @@
 #include "nextcloudclient.h"
 
 #include <QSettings>
+#include <QDebug>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
@@ -18,11 +19,13 @@ namespace {
 const int kPollIntervalMs = 2000;
 const int kMaxPollAttempts = 560; // ~18.5 minutes at 2s
 const char *kBookmarksApiBase = "/index.php/apps/bookmarks/public/rest/v2";
+const char *kSecretName = "harbour-nextmarks/session";
 }
 
 NextcloudClient::NextcloudClient(QObject *parent)
     : QObject(parent)
     , m_manager(new QNetworkAccessManager(this))
+    , m_secretsStore(QLatin1String(kSecretName))
 {
     m_pollTimer.setInterval(kPollIntervalMs);
     connect(&m_pollTimer, &QTimer::timeout, this, &NextcloudClient::pollNow);
@@ -68,16 +71,106 @@ void NextcloudClient::restoreSession()
 {
     QSettings settings;
     m_serverUrl = settings.value(QStringLiteral("serverUrl")).toString();
-    m_loginName = settings.value(QStringLiteral("loginName")).toString();
-    m_appPassword = settings.value(QStringLiteral("appPassword")).toString();
+    const bool pendingSecretDelete = settings.value(QStringLiteral("pendingSecretDelete"), false).toBool();
+
+    if (pendingSecretDelete) {
+        // A prior logout's Secrets delete failed; retry it now. Either way
+        // the user stays logged out this launch -- on success the secret is
+        // genuinely gone, and on failure it's still there, so falling
+        // through to load() below would silently resurrect the session the
+        // user explicitly ended (R6). Never load after this.
+        if (m_secretsStore.remove() == SecretsCredentialStore::Outcome::Succeeded) {
+            settings.remove(QStringLiteral("pendingSecretDelete"));
+        }
+        return;
+    }
+
+    const QString plaintextLoginName = settings.value(QStringLiteral("loginName")).toString();
+    const QString plaintextAppPassword = settings.value(QStringLiteral("appPassword")).toString();
+    if (!plaintextLoginName.isEmpty() || !plaintextAppPassword.isEmpty()) {
+        // Leftover from a version before this change shipped: migrate it
+        // into Secrets once, then forget it ever lived in QSettings (R4).
+        // The user stays logged in either way regardless of the store's
+        // outcome; if it fails, the plaintext value is left in place and
+        // this same check retries on the next launch rather than losing
+        // the session.
+        if (m_secretsStore.store(credentialFields(plaintextLoginName, plaintextAppPassword))
+                == SecretsCredentialStore::Outcome::Succeeded) {
+            settings.remove(QStringLiteral("loginName"));
+            settings.remove(QStringLiteral("appPassword"));
+        }
+        m_loginName = plaintextLoginName;
+        m_appPassword = plaintextAppPassword;
+        return;
+    }
+
+    QVariantMap credential;
+    auto loadOutcome = m_secretsStore.load(&credential);
+    if (loadOutcome == SecretsCredentialStore::Outcome::Succeeded) {
+        m_loginName = credential.value(QStringLiteral("loginName")).toString();
+        m_appPassword = credential.value(QStringLiteral("appPassword")).toString();
+    } else if (loadOutcome == SecretsCredentialStore::Outcome::Locked) {
+        // Confirmed on a real device (harbour-readeck hit this first): a
+        // post-boot CollectionIsLockedError does not reliably clear on its
+        // own within any bounded window -- silently waiting for it to
+        // resolve isn't viable. Deferred via singleShot so this fires
+        // after the QML window is shown (this runs from the constructor,
+        // before main() calls view->show()): the platform's own unlock
+        // prompt then appears as an overlay on top of the visible login
+        // screen, the same way other Secrets-using apps prompt once per
+        // boot.
+        QTimer::singleShot(0, this, &NextcloudClient::unlockSecretsInteractively);
+    }
 }
 
-void NextcloudClient::persistSession()
+void NextcloudClient::unlockSecretsInteractively()
+{
+    QVariantMap credential;
+    const auto outcome = m_secretsStore.load(&credential, /*allowInteraction=*/true);
+    if (outcome == SecretsCredentialStore::Outcome::Succeeded) {
+        m_loginName = credential.value(QStringLiteral("loginName")).toString();
+        m_appPassword = credential.value(QStringLiteral("appPassword")).toString();
+        emit isLoggedInChanged();
+    }
+    // Otherwise (user dismissed the prompt, or a genuine failure): stay on
+    // the login screen -- the user can still log in manually.
+}
+
+void NextcloudClient::persistServerUrl()
 {
     QSettings settings;
     settings.setValue(QStringLiteral("serverUrl"), m_serverUrl);
-    settings.setValue(QStringLiteral("loginName"), m_loginName);
-    settings.setValue(QStringLiteral("appPassword"), m_appPassword);
+}
+
+QVariantMap NextcloudClient::credentialFields(const QString &loginName, const QString &appPassword)
+{
+    QVariantMap credential;
+    credential[QStringLiteral("loginName")] = loginName;
+    credential[QStringLiteral("appPassword")] = appPassword;
+    return credential;
+}
+
+void NextcloudClient::persistCredential()
+{
+    if (m_secretsStore.store(credentialFields(m_loginName, m_appPassword)) == SecretsCredentialStore::Outcome::Succeeded) {
+        // This store supersedes whatever a prior failed logout's delete was
+        // tracking: the identifier's current secret is the one just
+        // authenticated, not the stale one a pending retry would delete.
+        // Without this, restoreSession()'s pendingSecretDelete branch would
+        // delete this brand-new session on the next launch and log it out.
+        // Flushed explicitly -- the same crash-safety reasoning as the
+        // flag's set side in logout() -- so a kill between the daemon-side
+        // store() succeeding and this write reaching disk can't leave the
+        // stale flag behind to delete the session it was just cleared for.
+        QSettings settings;
+        settings.remove(QStringLiteral("pendingSecretDelete"));
+        settings.sync();
+    } else {
+        // R5: the session still works for this run, held only in memory;
+        // nothing is written back to plaintext QSettings as a fallback.
+        qWarning() << "NextcloudClient: failed to store credential in Secrets; "
+                      "session will not survive an app restart";
+    }
 }
 
 QString NextcloudClient::normalizeServerUrl(const QString &input) const
@@ -188,14 +281,41 @@ void NextcloudClient::cancelLogin()
 
 void NextcloudClient::logout()
 {
+    // Everything written to QSettings for this logout -- the pending-delete
+    // flag (R6) and clearing any plaintext leftover from an interrupted
+    // migration (R7) -- happens here, together, and is flushed before the
+    // blocking delete call below. A process killed mid-call then leaves a
+    // retry flag with no plaintext leftover still present; writing the
+    // plaintext-clear only after that blocking call returned would let a
+    // kill during it leave "pending flag + plaintext still present" on
+    // disk, which restoreSession()'s pending-delete branch never checks --
+    // the plaintext would survive untouched until a later successful retry
+    // clears the flag, and the launch after that would silently resurrect
+    // it via the migration path (the same bug R7 fixes, reopened by
+    // ordering rather than missing logic).
+    QSettings settings;
+    settings.setValue(QStringLiteral("pendingSecretDelete"), true);
+    settings.remove(QStringLiteral("loginName"));
+    settings.remove(QStringLiteral("appPassword"));
+    settings.sync();
+
+    if (m_secretsStore.remove() == SecretsCredentialStore::Outcome::Succeeded) {
+        settings.remove(QStringLiteral("pendingSecretDelete"));
+    } else {
+        // Daemon unreachable or some other genuine failure: the app still
+        // logs the user out now, but the stale secret may still exist, so
+        // the flag set above makes restoreSession() retry-delete it on the
+        // next launch before trusting any load -- never let a failed-delete
+        // secret silently resurrect this session (R6).
+        qWarning() << "NextcloudClient: failed to delete credential from Secrets; "
+                      "will retry on next launch";
+    }
+
     m_serverUrl.clear();
     m_loginName.clear();
     m_appPassword.clear();
     m_folders.clear();
-    QSettings settings;
     settings.remove(QStringLiteral("serverUrl"));
-    settings.remove(QStringLiteral("loginName"));
-    settings.remove(QStringLiteral("appPassword"));
     emit isLoggedInChanged();
     emit serverUrlChanged();
     emit loginNameChanged();
@@ -250,7 +370,8 @@ void NextcloudClient::pollNow()
             }
             m_loginName = loginName;
             m_appPassword = appPassword;
-            persistSession();
+            persistServerUrl();
+            persistCredential();
 
             m_pollTimer.stop();
             m_pollToken.clear();
