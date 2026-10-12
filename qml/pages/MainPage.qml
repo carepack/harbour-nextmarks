@@ -39,6 +39,11 @@ Page {
             banner.text = message
             banner.visible = true
         }
+        onFolderRenameFailed: {
+            banner.color = Theme.rgba(Theme.highlightBackgroundColor, 0.9)
+            banner.text = message
+            banner.visible = true
+        }
         // Previously unconnected: a failed folder load (a network hiccup,
         // a server error) silently left the list empty with no
         // indication why, showing "No folders yet" -- indistinguishable
@@ -130,6 +135,14 @@ Page {
                     MenuItem {
                         text: qsTr("New subfolder")
                         onClicked: pageStack.push(Qt.resolvedUrl("NewFolderDialog.qml"), { parentFolderId: modelData.id })
+                    }
+                    MenuItem {
+                        text: qsTr("Rename folder")
+                        onClicked: pageStack.push(Qt.resolvedUrl("RenameFolderDialog.qml"), {
+                            folderId: modelData.id,
+                            initialTitle: modelData.title,
+                            parentFolderId: modelData.parentId
+                        })
                     }
                     MenuItem {
                         text: qsTr("Delete folder")

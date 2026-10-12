@@ -104,6 +104,10 @@
         <translation>Neuer Unterordner</translation>
     </message>
     <message>
+        <source>Rename folder</source>
+        <translation>Ordner umbenennen</translation>
+    </message>
+    <message>
         <source>Delete folder</source>
         <translation>Ordner löschen</translation>
     </message>
@@ -129,6 +133,17 @@
     <message>
         <source>Create</source>
         <translation>Erstellen</translation>
+    </message>
+    <message>
+        <source>Folder name</source>
+        <translation>Ordnername</translation>
+    </message>
+</context>
+<context>
+    <name>RenameFolderDialog</name>
+    <message>
+        <source>Rename</source>
+        <translation>Umbenennen</translation>
     </message>
     <message>
         <source>Folder name</source>

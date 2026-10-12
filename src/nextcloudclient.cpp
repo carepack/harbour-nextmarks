@@ -388,7 +388,7 @@ void NextcloudClient::pollNow()
     });
 }
 
-void NextcloudClient::flattenFolders(const QVariantList &nodes, int depth, QVariantList &out) const
+void NextcloudClient::flattenFolders(const QVariantList &nodes, int depth, int parentId, QVariantList &out) const
 {
     // Depth-first pre-order, same as a nested tree would print top to
     // bottom -- QML's FolderPickerPage relies on this exact ordering to
@@ -412,15 +412,17 @@ void NextcloudClient::flattenFolders(const QVariantList &nodes, int depth, QVari
         const QVariantMap node = nodeVariant.toMap();
         const QVariantList children = node.value(QStringLiteral("children")).toList();
 
+        const int id = node.value(QStringLiteral("id")).toInt();
         QVariantMap item;
-        item[QStringLiteral("id")] = node.value(QStringLiteral("id"));
+        item[QStringLiteral("id")] = id;
         item[QStringLiteral("title")] = node.value(QStringLiteral("title"));
         item[QStringLiteral("depth")] = depth;
         item[QStringLiteral("hasChildren")] = !children.isEmpty();
+        item[QStringLiteral("parentId")] = parentId;
         out << item;
 
         if (!children.isEmpty()) {
-            flattenFolders(children, depth + 1, out);
+            flattenFolders(children, depth + 1, id, out);
         }
     }
 }
@@ -456,9 +458,10 @@ void NextcloudClient::loadFolders()
         rootItem[QStringLiteral("title")] = tr("(No folder)");
         rootItem[QStringLiteral("depth")] = 0;
         rootItem[QStringLiteral("hasChildren")] = false;
+        rootItem[QStringLiteral("parentId")] = -1;
         flat << rootItem;
 
-        flattenFolders(data.toVariantList(), 0, flat);
+        flattenFolders(data.toVariantList(), 0, -1, flat);
         m_folders = flat;
         emit foldersChanged();
         reply->deleteLater();
@@ -542,6 +545,33 @@ void NextcloudClient::deleteFolder(int folderId)
             const QString message = extractErrorMessage(reply, raw);
             setLastError(message);
             emit folderDeleteFailed(message);
+        }
+        reply->deleteLater();
+    });
+}
+
+void NextcloudClient::renameFolder(int folderId, const QString &title, int parentFolderId)
+{
+    setBusy(true);
+    setLastError(QString());
+
+    QJsonObject body;
+    body[QStringLiteral("title")] = title;
+    body[QStringLiteral("parent_folder")] = parentFolderId;
+
+    QNetworkReply *reply = m_manager->put(
+        buildRequest(QLatin1String(kBookmarksApiBase) + QStringLiteral("/folder/") + QString::number(folderId)),
+        QJsonDocument(body).toJson(QJsonDocument::Compact));
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        const QByteArray raw = reply->readAll();
+        setBusy(false);
+        if (reply->error() == QNetworkReply::NoError) {
+            loadFolders();
+            emit folderRenamed();
+        } else {
+            const QString message = extractErrorMessage(reply, raw);
+            setLastError(message);
+            emit folderRenameFailed(message);
         }
         reply->deleteLater();
     });
