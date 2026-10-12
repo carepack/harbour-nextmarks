@@ -24,20 +24,20 @@ Page {
 
                 Label {
                     width: parent.width
-                    horizontalAlignment: Text.AlignHCenter
                     text: qsTr("Server")
                     color: Theme.secondaryHighlightColor
                     font.pixelSize: Theme.fontSizeSmall
                 }
                 Label {
                     width: parent.width
-                    horizontalAlignment: Text.AlignHCenter
                     wrapMode: Text.WrapAnywhere
                     text: nextcloudClient.serverUrl
                     color: Theme.highlightColor
                     font.pixelSize: Theme.fontSizeSmall
                 }
             }
+
+            Item { width: parent.width; height: Theme.paddingMedium }
 
             Column {
                 x: Theme.horizontalPageMargin
@@ -46,14 +46,12 @@ Page {
 
                 Label {
                     width: parent.width
-                    horizontalAlignment: Text.AlignHCenter
                     text: qsTr("User")
                     color: Theme.secondaryHighlightColor
                     font.pixelSize: Theme.fontSizeSmall
                 }
                 Label {
                     width: parent.width
-                    horizontalAlignment: Text.AlignHCenter
                     wrapMode: Text.WrapAnywhere
                     text: nextcloudClient.loginName
                     color: Theme.highlightColor
