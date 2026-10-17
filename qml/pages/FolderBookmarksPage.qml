@@ -81,6 +81,10 @@ Page {
                     })
                 }
                 MenuItem {
+                    text: qsTr("Copy link")
+                    onClicked: Clipboard.text = modelData.url
+                }
+                MenuItem {
                     text: qsTr("Delete")
                     onClicked: nextcloudClient.deleteBookmark(modelData.id)
                 }
