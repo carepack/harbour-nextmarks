@@ -1,5 +1,12 @@
 # Add newest entries at the top.
 
+* Sat Oct 17 2026 Contributor <contributor@example.com> 1.0.3-1
+- Open links directly into Nextmarks from the system's "open with" menu
+  (e.g. after scanning a QR code with the Camera app) -- not just via Share
+- Copy a bookmark's link from its context menu
+- Fix: a link shared or opened while your device was still unlocking could
+  be lost instead of opening the save dialog
+
 * Mon Oct 12 2026 Contributor <contributor@example.com> 1.0.2-1
 - Rename folders from their context menu
 - Edit a bookmark's URL, title, and folder after saving it

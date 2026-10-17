@@ -9,6 +9,8 @@ Name[de]=Nextmarks
 # spawning a second one.
 X-Nemo-Single-Instance=yes
 X-Share-Methods=link
+MimeType=text/html;x-scheme-handler/https;x-scheme-handler/http;
+X-DBusActivatable=true
 
 [X-Share Method link]
 Description=Save to Nextcloud Bookmarks

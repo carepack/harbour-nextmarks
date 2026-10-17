@@ -1,7 +1,7 @@
 Name:       harbour-nextmarks
 
 Summary:    Save links to Nextcloud Bookmarks
-Version:    1.0.2
+Version:    1.0.3
 Release:    1
 License:    MIT
 URL:        https://github.com/carepack/harbour-nextmarks

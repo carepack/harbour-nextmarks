@@ -13,6 +13,17 @@ Page {
 
     onStatusChanged: {
         if (status === PageStatus.Active) {
+            // Tells shareReceiver (see src/sharereceiver.h) that Silica's
+            // own page stack has genuinely finished loading AND
+            // transitioning in its initial page -- Component.onCompleted
+            // fires too early (confirmed live on the sibling
+            // harbour-readeck project: Silica's own "cannot push while
+            // transition is in progress" warning fired when a pending
+            // share/open push raced that transition). Only once Active is
+            // it safe to push SaveBookmarkPage. This page is the
+            // initialPage when isLoggedIn was already true at QML parse
+            // time, so LoginPage's own Active transition never fires.
+            shareReceiver.pageStackReady = true
             nextcloudClient.loadFolders()
         }
     }

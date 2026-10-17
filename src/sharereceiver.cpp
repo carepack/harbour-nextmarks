@@ -61,10 +61,23 @@ void ShareReceiver::registerService()
     }
     bus.registerObject(QStringLiteral("/share/link"), m_target);
 
+    // Second interface on the same service (not a second service): the
+    // freedesktop.org "D-Bus Activation" standard interface, at the
+    // object path the spec derives from this service's own name
+    // (harbour-nextmarks.harbour-nextmarks -> /harbour_nextmarks/harbour_nextmarks).
+    // Lets the system's "open with" chooser activate this app for an
+    // http/https link -- see AppActivationAdaptor and
+    // harbour-nextmarks.desktop's MimeType/X-DBusActivatable.
+    if (!m_appActivationTarget) {
+        m_appActivationTarget = new QObject(this);
+        new AppActivationAdaptor(m_appActivationTarget, this);
+    }
+    bus.registerObject(QStringLiteral("/harbour_nextmarks/harbour_nextmarks"), m_appActivationTarget);
+
     // Claim the OrganizationName.ApplicationName the share sheet expects
     // (see harbour-nextmarks.desktop's [X-Sailjail] section) last: this is
-    // what unblocks a pending D-Bus-activated call, so the object above
-    // must already be registered by the time it can arrive.
+    // what unblocks a pending D-Bus-activated call, so the objects above
+    // must already be registered by the time one can arrive.
     bus.registerService(QStringLiteral("harbour-nextmarks.harbour-nextmarks"));
 }
 
@@ -106,6 +119,19 @@ void ShareReceiver::handleShare(const QVariantMap &args)
     // share sheet's own call to us appears to give up if we don't answer
     // promptly when D-Bus activation had to cold-start the app, so the
     // page push is queued for setReady() rather than made to wait here.
+    deliverOrQueue(url, title);
+}
+
+void ShareReceiver::handleOpen(const QString &url)
+{
+    // org.freedesktop.Application.Open has no standardized title field in
+    // platformData, so unlike a share (which gets a title from the share
+    // sheet's own call), an Open-delivered URL always arrives titleless.
+    deliverOrQueue(url, QString());
+}
+
+void ShareReceiver::deliverOrQueue(const QString &url, const QString &title)
+{
     if (m_ready) {
         emit bookmarkShared(url, title);
     } else {
@@ -124,4 +150,27 @@ ShareAdaptor::ShareAdaptor(QObject *targetObject, ShareReceiver *receiver)
 void ShareAdaptor::share(const QVariantMap &args)
 {
     m_receiver->handleShare(args);
+}
+
+AppActivationAdaptor::AppActivationAdaptor(QObject *targetObject, ShareReceiver *receiver)
+    : QDBusAbstractAdaptor(targetObject)
+    , m_receiver(receiver)
+{
+}
+
+void AppActivationAdaptor::Open(const QStringList &uris, const QVariantMap &platformData)
+{
+    Q_UNUSED(platformData)
+    for (const QString &uri : uris) {
+        if (uri.startsWith(QStringLiteral("http://")) || uri.startsWith(QStringLiteral("https://"))) {
+            m_receiver->handleOpen(uri);
+            return;
+        }
+    }
+}
+
+void AppActivationAdaptor::Activate(const QVariantMap &platformData)
+{
+    Q_UNUSED(platformData)
+    emit m_receiver->activateRequested();
 }

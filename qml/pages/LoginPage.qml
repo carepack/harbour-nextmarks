@@ -5,6 +5,19 @@ Page {
     id: page
     allowedOrientations: Orientation.All
 
+    // Tells shareReceiver (see src/sharereceiver.h) that Silica's own
+    // page stack has genuinely finished loading AND transitioning in its
+    // initial page -- Component.onCompleted fires too early (confirmed
+    // live on the sibling harbour-readeck project: Silica's own "cannot
+    // push while transition is in progress" warning fired when a pending
+    // share/open push raced that transition). Only once Active is it
+    // safe to push SaveBookmarkPage.
+    onStatusChanged: {
+        if (status === PageStatus.Active) {
+            shareReceiver.pageStackReady = true
+        }
+    }
+
     Connections {
         target: nextcloudClient
         onIsLoggedInChanged: {
