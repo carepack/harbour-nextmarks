@@ -19,6 +19,10 @@
         <translation>Bearbeiten</translation>
     </message>
     <message>
+        <source>Copy link</source>
+        <translation>Link kopieren</translation>
+    </message>
+    <message>
         <source>Delete</source>
         <translation>Löschen</translation>
     </message>
